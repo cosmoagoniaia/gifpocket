@@ -1,9 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
-// ⚠️ Sostituisci con la tua chiave da developers.giphy.com
-const GIPHY_KEY = "dc6zaTOxFJmzC";
-const GIPHY_SEARCH = "https://api.giphy.com/v1/gifs/search";
-const GIPHY_TRENDING = "https://api.giphy.com/v1/gifs/trending";
+const TENOR_KEY = "AIzaSyDxNmS8Q3NM0MUAhu3j17lK4qvBGKNO8PI";
+const TENOR_SEARCH = "https://tenor.googleapis.com/v2/search";
+const TENOR_FEATURED = "https://tenor.googleapis.com/v2/featured";
 
 const COLORS = ["#FF6B6B","#FF9F43","#FECA57","#48DBFB","#FF9FF3","#54A0FF","#A29BFE","#01CBC6"];
 const COLLECTION_COLORS = ["#FF6B6B","#FF9F43","#FECA57","#48DBFB","#FF9FF3","#54A0FF","#A29BFE","#01CBC6","#6C5CE7","#00B894"];
@@ -23,6 +22,15 @@ function useLocalStorage(key, initial) {
   return [val, setVal];
 }
 
+function parseTenorResults(data) {
+  return (data.results || []).map(g => ({
+    id: g.id,
+    giphyId: g.id,
+    url: g.media_formats?.gif?.url || g.media_formats?.tinygif?.url || "",
+    title: g.content_description || g.title || "GIF",
+  })).filter(g => g.url);
+}
+
 export default function GIFpocket() {
   const [gifs, setGifs] = useLocalStorage("gifpocket_gifs", []);
   const [collections, setCollections] = useLocalStorage("gifpocket_collections", []);
@@ -34,14 +42,12 @@ export default function GIFpocket() {
   const [copied, setCopied] = useState(null);
   const [hoveredId, setHoveredId] = useState(null);
 
-  // GIPHY
   const [giphyQuery, setGiphyQuery] = useState("");
   const [giphyResults, setGiphyResults] = useState([]);
   const [giphyLoading, setGiphyLoading] = useState(false);
   const [savedIds, setSavedIds] = useState(new Set());
   const debounce = useRef(null);
 
-  // Save modal
   const [saveModal, setSaveModal] = useState(null);
   const [pendingTags, setPendingTags] = useState([]);
   const [tagInput, setTagInput] = useState("");
@@ -49,13 +55,11 @@ export default function GIFpocket() {
   const [manualUrl, setManualUrl] = useState("");
   const [manualTitle, setManualTitle] = useState("");
 
-  // Collection modal
   const [showNewCollection, setShowNewCollection] = useState(false);
   const [newColName, setNewColName] = useState("");
   const [newColEmoji, setNewColEmoji] = useState("📁");
   const [newColColor, setNewColColor] = useState(COLLECTION_COLORS[0]);
 
-  // Add to collection from card
   const [addToColModal, setAddToColModal] = useState(null);
 
   useEffect(() => { setSavedIds(new Set(gifs.map((g) => g.giphyId).filter(Boolean))); }, [gifs]);
@@ -64,15 +68,11 @@ export default function GIFpocket() {
     setGiphyLoading(true);
     try {
       const url = q.trim()
-        ? `${GIPHY_SEARCH}?api_key=${GIPHY_KEY}&q=${encodeURIComponent(q)}&limit=24&rating=g`
-        : `${GIPHY_TRENDING}?api_key=${GIPHY_KEY}&limit=24&rating=g`;
+        ? `${TENOR_SEARCH}?q=${encodeURIComponent(q)}&key=${TENOR_KEY}&limit=24&media_filter=gif`
+        : `${TENOR_FEATURED}?key=${TENOR_KEY}&limit=24&media_filter=gif`;
       const res = await fetch(url);
       const data = await res.json();
-      setGiphyResults((data.data || []).map(g => ({
-        id: g.id, giphyId: g.id,
-        url: g.images.fixed_height.url,
-        title: g.title,
-      })));
+      setGiphyResults(parseTenorResults(data));
     } catch { setGiphyResults([]); }
     finally { setGiphyLoading(false); }
   }, []);
@@ -114,7 +114,7 @@ export default function GIFpocket() {
       giphyId: source === "giphy" ? gif.giphyId : undefined,
       url,
       title: source === "giphy" ? gif.title : (manualTitle.trim() || "GIF senza titolo"),
-      tags: pendingTags.length > 0 ? pendingTags : [source === "giphy" ? "giphy" : "custom"],
+      tags: pendingTags.length > 0 ? pendingTags : [source === "giphy" ? "tenor" : "custom"],
       collections: selectedCollections,
       addedAt: Date.now(),
     }, ...prev]);
@@ -176,7 +176,7 @@ export default function GIFpocket() {
           {[
             { id: "pocket", label: "Il mio Pocket", badge: gifs.length },
             { id: "collections", label: "Collezioni", badge: collections.length },
-            { id: "search", label: "Cerca su GIPHY" },
+            { id: "search", label: "Cerca GIF" },
           ].map((t) => (
             <button key={t.id} style={{ ...s.navBtn, ...(tab === t.id ? s.navActive : {}) }}
               onClick={() => { setTab(t.id); setActiveCollection(null); setActiveTag(null); setSearch(""); }}>
@@ -229,8 +229,8 @@ export default function GIFpocket() {
             <div style={s.empty}>
               <div style={{ fontSize: 48, marginBottom: 16 }}>📭</div>
               <p style={s.emptyT}>Il tuo pocket è vuoto</p>
-              <p style={s.emptyS}>Vai su "Cerca su GIPHY" per aggiungere le tue prime GIF</p>
-              <button style={{ ...s.urlBtn, marginTop: 20, padding: "12px 24px", fontSize: 15 }} onClick={() => setTab("search")}>Cerca su GIPHY →</button>
+              <p style={s.emptyS}>Vai su "Cerca GIF" per aggiungere le tue prime GIF</p>
+              <button style={{ ...s.urlBtn, marginTop: 20, padding: "12px 24px", fontSize: 15 }} onClick={() => setTab("search")}>Cerca GIF →</button>
             </div>
           ) : filtered.length === 0 ? (
             <div style={s.empty}><p style={s.emptyT}>Nessun risultato</p><p style={s.emptyS}>Prova un altro filtro</p></div>
@@ -320,16 +320,16 @@ export default function GIFpocket() {
         </div>
       )}
 
-      {/* ── GIPHY SEARCH ── */}
+      {/* ── SEARCH ── */}
       {tab === "search" && (
         <div style={s.page}>
           <div style={{ marginBottom: 20 }}>
             <div style={s.searchWrap}>
               <span style={s.sIco}>⌕</span>
-              <input style={s.sInput} placeholder="Cerca GIF su GIPHY..." value={giphyQuery} onChange={handleGiphyInput} autoFocus />
+              <input style={s.sInput} placeholder="Cerca qualsiasi GIF..." value={giphyQuery} onChange={handleGiphyInput} autoFocus />
               {giphyQuery && <button style={s.clearBtn} onClick={() => { setGiphyQuery(""); fetchGiphy(""); }}>✕</button>}
             </div>
-            {!giphyQuery && <p style={{ fontSize: 12, color: "#444", marginTop: 10, fontStyle: "italic" }}>Trending adesso su GIPHY</p>}
+            {!giphyQuery && <p style={{ fontSize: 12, color: "#444", marginTop: 10, fontStyle: "italic" }}>GIF in tendenza adesso</p>}
           </div>
           {giphyLoading ? (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "80px 0" }}>
@@ -379,7 +379,7 @@ export default function GIFpocket() {
             ) : (
               <>
                 <label style={s.lbl}>URL della GIF *</label>
-                <input style={s.mInput} placeholder="https://media.giphy.com/..." value={manualUrl} onChange={(e) => setManualUrl(e.target.value)} autoFocus />
+                <input style={s.mInput} placeholder="https://..." value={manualUrl} onChange={(e) => setManualUrl(e.target.value)} autoFocus />
                 {manualUrl && (
                   <div style={{ borderRadius: 12, overflow: "hidden", margin: "12px 0", background: "#111", maxHeight: 160, display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <img src={manualUrl} alt="preview" style={{ maxWidth: "100%", maxHeight: 160, objectFit: "contain" }} />
