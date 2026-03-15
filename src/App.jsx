@@ -1,9 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
-const TENOR_KEY = "AIzaSyDxNmS8Q3NM0MUAhu3j17lK4qvBGKNO8PI";
-const TENOR_SEARCH = "https://tenor.googleapis.com/v2/search";
-const TENOR_FEATURED = "https://tenor.googleapis.com/v2/featured";
-
 const COLORS = ["#FF6B6B","#FF9F43","#FECA57","#48DBFB","#FF9FF3","#54A0FF","#A29BFE","#01CBC6"];
 const COLLECTION_COLORS = ["#FF6B6B","#FF9F43","#FECA57","#48DBFB","#FF9FF3","#54A0FF","#A29BFE","#01CBC6","#6C5CE7","#00B894"];
 
@@ -20,15 +16,6 @@ function useLocalStorage(key, initial) {
   });
   useEffect(() => { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }, [key, val]);
   return [val, setVal];
-}
-
-function parseTenorResults(data) {
-  return (data.results || []).map(g => ({
-    id: g.id,
-    giphyId: g.id,
-    url: g.media_formats?.gif?.url || g.media_formats?.tinygif?.url || "",
-    title: g.content_description || g.title || "GIF",
-  })).filter(g => g.url);
 }
 
 export default function GIFpocket() {
@@ -67,12 +54,14 @@ export default function GIFpocket() {
   const fetchGiphy = useCallback(async (q) => {
     setGiphyLoading(true);
     try {
-      const url = q.trim()
-        ? `${TENOR_SEARCH}?q=${encodeURIComponent(q)}&key=${TENOR_KEY}&limit=24&media_filter=gif`
-        : `${TENOR_FEATURED}?key=${TENOR_KEY}&limit=24&media_filter=gif`;
+      const url = q.trim() ? `/api/gifs?q=${encodeURIComponent(q)}` : `/api/gifs`;
       const res = await fetch(url);
       const data = await res.json();
-      setGiphyResults(parseTenorResults(data));
+      setGiphyResults((data.data || []).map(g => ({
+        id: g.id, giphyId: g.id,
+        url: g.images.fixed_height.url,
+        title: g.title,
+      })));
     } catch { setGiphyResults([]); }
     finally { setGiphyLoading(false); }
   }, []);
@@ -110,13 +99,10 @@ export default function GIFpocket() {
     const url = source === "giphy" ? gif.url : manualUrl.trim();
     if (!url) return;
     setGifs((prev) => [{
-      id: Date.now(),
-      giphyId: source === "giphy" ? gif.giphyId : undefined,
-      url,
-      title: source === "giphy" ? gif.title : (manualTitle.trim() || "GIF senza titolo"),
-      tags: pendingTags.length > 0 ? pendingTags : [source === "giphy" ? "tenor" : "custom"],
-      collections: selectedCollections,
-      addedAt: Date.now(),
+      id: Date.now(), giphyId: source === "giphy" ? gif.giphyId : undefined,
+      url, title: source === "giphy" ? gif.title : (manualTitle.trim() || "GIF senza titolo"),
+      tags: pendingTags.length > 0 ? pendingTags : [source === "giphy" ? "giphy" : "custom"],
+      collections: selectedCollections, addedAt: Date.now(),
     }, ...prev]);
     setSaveModal(null);
   }
@@ -188,7 +174,6 @@ export default function GIFpocket() {
         <button style={s.urlBtn} onClick={() => openSaveModal({ id: "_manual" }, "manual")}>+ URL</button>
       </header>
 
-      {/* ── POCKET ── */}
       {tab === "pocket" && (
         <div style={s.page}>
           <div style={s.toolbar}>
@@ -267,7 +252,6 @@ export default function GIFpocket() {
         </div>
       )}
 
-      {/* ── COLLECTIONS ── */}
       {tab === "collections" && (
         <div style={s.page}>
           <div style={s.colHeader}>
@@ -320,13 +304,12 @@ export default function GIFpocket() {
         </div>
       )}
 
-      {/* ── SEARCH ── */}
       {tab === "search" && (
         <div style={s.page}>
           <div style={{ marginBottom: 20 }}>
             <div style={s.searchWrap}>
               <span style={s.sIco}>⌕</span>
-              <input style={s.sInput} placeholder="Cerca qualsiasi GIF..." value={giphyQuery} onChange={handleGiphyInput} autoFocus />
+              <input style={s.sInput} placeholder="Cerca GIF..." value={giphyQuery} onChange={handleGiphyInput} autoFocus />
               {giphyQuery && <button style={s.clearBtn} onClick={() => { setGiphyQuery(""); fetchGiphy(""); }}>✕</button>}
             </div>
             {!giphyQuery && <p style={{ fontSize: 12, color: "#444", marginTop: 10, fontStyle: "italic" }}>GIF in tendenza adesso</p>}
@@ -336,10 +319,7 @@ export default function GIFpocket() {
               <div style={{ width: 36, height: 36, border: "3px solid rgba(255,255,255,0.1)", borderTopColor: "#FF9F43", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
             </div>
           ) : giphyResults.length === 0 ? (
-            <div style={s.empty}>
-              <p style={s.emptyT}>Nessun risultato</p>
-              <p style={s.emptyS}>Prova un altro termine di ricerca</p>
-            </div>
+            <div style={s.empty}><p style={s.emptyT}>Nessun risultato</p><p style={s.emptyS}>Prova un altro termine</p></div>
           ) : (
             <div style={s.gGrid}>
               {giphyResults.map((g) => {
@@ -366,7 +346,6 @@ export default function GIFpocket() {
         </div>
       )}
 
-      {/* ── MODAL: SALVA ── */}
       {saveModal && (
         <div style={s.backdrop} onClick={() => setSaveModal(null)}>
           <div style={s.modal} onClick={(e) => e.stopPropagation()}>
@@ -416,7 +395,6 @@ export default function GIFpocket() {
         </div>
       )}
 
-      {/* ── MODAL: GESTISCI COLLEZIONI DA CARD ── */}
       {addToColModal && (
         <div style={s.backdrop} onClick={() => setAddToColModal(null)}>
           <div style={s.modal} onClick={(e) => e.stopPropagation()}>
@@ -448,7 +426,6 @@ export default function GIFpocket() {
         </div>
       )}
 
-      {/* ── MODAL: NUOVA COLLEZIONE ── */}
       {showNewCollection && (
         <div style={s.backdrop} onClick={() => setShowNewCollection(false)}>
           <div style={s.modal} onClick={(e) => e.stopPropagation()}>
