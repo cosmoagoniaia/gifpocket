@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
 // ⚠️ Sostituisci con la tua chiave da developers.giphy.com
-const GIPHY_KEY = "dcApjiuczFNVUnC16oSYCkgLG7fu197tkr";
+const GIPHY_KEY = "dApjiuczFNVUnC16oSYCkgLG7fu197tkr";
 const GIPHY_SEARCH = "https://api.giphy.com/v1/gifs/search";
 const GIPHY_TRENDING = "https://api.giphy.com/v1/gifs/trending";
 
